@@ -32,11 +32,18 @@ io.on('connection', (socket) => {
     socket.on('join-room', (roomId) => {
         socket.join(roomId);
         console.log(`User ${socket.id} joined room ${roomId}`);
+        // Request existing state from others in the room
+        socket.to(roomId).emit('request-sync', { requesterId: socket.id });
     });
 
     socket.on('canvas-event', (event: CanvasEvent) => {
         // Broadcast to everyone else in the room
         socket.to(event.room).emit('canvas-event', event);
+    });
+
+    socket.on('sync-state', (data: { room: string; state: any; targetId: string }) => {
+        // Send state specifically to the requester
+        io.to(data.targetId).emit('load-state', data.state);
     });
 
     socket.on('disconnect', () => {
@@ -48,7 +55,7 @@ process.on('uncaughtException', (err) => {
     console.error('UNCAUGHT EXCEPTION:', err);
 });
 
-const PORT = 3003;
+const PORT = process.env.PORT || 3003;
 
 httpServer.on('error', (err: any) => {
     if (err.code === 'EADDRINUSE') {

@@ -56,7 +56,7 @@ const App: React.FC = () => {
 
 
     const {
-        setCanvasRef, addShape, clearCanvas, deleteSelected, undo, redo, testDraw, copy, paste, cut, duplicate, resetWhiteboard, uploadImage, canvas, zoom, resetZoom, zoomIn, zoomOut
+        setCanvasRef, addShape, clearCanvas, deleteSelected, undo, redo, testDraw, copy, paste, cut, duplicate, resetWhiteboard, uploadImage, canvas, zoom, resetZoom, zoomIn, zoomOut, isConnected
     } = useWhiteboard({
         activeTool,
         color: brushColor,
@@ -174,8 +174,12 @@ const App: React.FC = () => {
     return (
         <div className="app-layout" onContextMenu={(e) => e.preventDefault()}>
             <header className="header-centered">
-                <h1 className="title-interactive" onClick={() => testDraw()}>
+                <h1 className="title-interactive" onClick={() => testDraw()} style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                     LOBOS-BOARD
+                    <span
+                        className={`status-dot ${isConnected ? 'online' : 'offline'}`}
+                        title={isConnected ? 'Conectado al servidor' : 'Desconectado - Intentando reconectar...'}
+                    />
                 </h1>
 
                 <div className="divider" />

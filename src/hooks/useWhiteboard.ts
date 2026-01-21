@@ -22,6 +22,7 @@ export const useWhiteboard = ({
 }: WhiteboardHookProps) => {
     const [canvas, setCanvas] = useState<any>(null);
     const [zoom, setZoom] = useState<number>(1);
+    const [isConnected, setIsConnected] = useState<boolean>(false);
     const canvasRef = useRef<any>(null);
     const socketRef = useRef<Socket | null>(null);
 
@@ -154,19 +155,62 @@ export const useWhiteboard = ({
         });
 
         // 2. Sockets - Smart URL detection
-        // If accessing from localhost, use local server. Otherwise use tunnel URL.
+        // If accessing from localhost, use local server. Otherwise use tunnel/production URL.
         const isLocalhost = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+
+        // Use the Render URL as the absolute fallback for non-localhost environments
+        const productionSocketUrl = 'https://lobos-board-server.onrender.com';
         const socketUrl = isLocalhost
             ? 'http://127.0.0.1:3003'
-            : (import.meta.env.VITE_SOCKET_URL || 'http://127.0.0.1:3003');
+            : (import.meta.env.VITE_SOCKET_URL || productionSocketUrl);
 
-        console.log(`DEBUG: Connecting to Socket.IO at: ${socketUrl}`);
+        console.log(`DEBUG: Connecting to Socket.IO at: ${socketUrl} (isLocalhost: ${isLocalhost})`);
         const socket = io(socketUrl, {
-            transports: ['websocket', 'polling'],
-            reconnection: true
+            transports: ['polling', 'websocket'], // Try polling first for better compatibility
+            reconnection: true,
+            reconnectionAttempts: 10,
+            reconnectionDelay: 1000
         });
         socketRef.current = socket;
-        socket.emit('join-room', roomId);
+
+        socket.on('connect', () => {
+            console.log('CONNECTED to Socket.IO:', socket.id);
+            setIsConnected(true);
+            socket.emit('join-room', roomId);
+        });
+
+        socket.on('disconnect', () => {
+            console.log('DISCONNECTED from Socket.IO');
+            setIsConnected(false);
+        });
+
+        socket.on('connect_error', (error) => {
+            console.error('SOCKET CONNECTION ERROR:', error);
+            setIsConnected(false);
+        });
+
+        // Room State Synchronization
+        socket.on('request-sync', (data: { requesterId: string }) => {
+            // Only the "teacher" (non-readonly or someone already there) should respond
+            // Simplification: everyone responds, the first one to arrive at the student wins
+            if (!isReadOnly && fabricCanvas) {
+                console.log('Sync requested by:', data.requesterId);
+                const state = fabricCanvas.toJSON();
+                socket.emit('sync-state', { room: roomId, state, targetId: data.requesterId });
+            }
+        });
+
+        socket.on('load-state', (state: any) => {
+            if (fabricCanvas) {
+                console.log('Loading existing room state...');
+                isRestoringRef.current = true;
+                fabricCanvas.loadFromJSON(state, () => {
+                    fabricCanvas.requestRenderAll();
+                    isRestoringRef.current = false;
+                    console.log('Room state loaded.');
+                });
+            }
+        });
 
         socket.on('canvas-event', (event: any) => {
             const util = getConstructor('util');
@@ -1931,6 +1975,7 @@ export const useWhiteboard = ({
         zoom,
         resetZoom,
         zoomIn,
-        zoomOut
+        zoomOut,
+        isConnected
     };
 };
