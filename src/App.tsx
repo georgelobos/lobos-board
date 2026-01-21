@@ -20,11 +20,11 @@ const App: React.FC = () => {
     const [isUnderline, setIsUnderline] = useState<boolean>(false);
     const [isDashed, setIsDashed] = useState<boolean>(false);
 
-    const [roomId, setRoomId] = useState<string>(() => {
+    const [roomId] = useState<string>(() => {
         const params = new URLSearchParams(window.location.search);
         return params.get('room') || 'room-' + Math.random().toString(36).substr(2, 9);
     });
-    const [isReadOnly, setIsReadOnly] = useState<boolean>(() => {
+    const [isReadOnly] = useState<boolean>(() => {
         const params = new URLSearchParams(window.location.search);
         return params.get('view') === 'true';
     });
