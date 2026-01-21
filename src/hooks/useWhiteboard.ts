@@ -138,6 +138,13 @@ export const useWhiteboard = ({
         });
         fabricCanvas.on('object:removed', (e: any) => {
             if (e.target && !e.target.remote) saveHistory();
+
+            if (activeToolRef.current === 'eraser') {
+                // Broadcast erase if not remote
+                if (e.target.id && !e.target.remote) {
+                    socketRef.current?.emit('canvas-event', { room: roomId, type: 'object:removed', id: e.target.id });
+                }
+            }
         });
         fabricCanvas.on('object:modified', () => saveHistory());
 
@@ -205,9 +212,18 @@ export const useWhiteboard = ({
                 console.log('Loading existing room state...');
                 isRestoringRef.current = true;
                 fabricCanvas.loadFromJSON(state, () => {
+                    // Force read-only settings on loaded objects
+                    fabricCanvas.getObjects().forEach((obj: any) => {
+                        obj.set({
+                            selectable: false,
+                            evented: !isReadOnly || activeToolRef.current === 'zoom',
+                            lockMovementX: true,
+                            lockMovementY: true
+                        });
+                    });
                     fabricCanvas.requestRenderAll();
                     isRestoringRef.current = false;
-                    console.log('Room state loaded.');
+                    console.log('Room state loaded and locked for student.');
                 });
             }
         });
@@ -337,7 +353,7 @@ export const useWhiteboard = ({
                 window.removeEventListener('resize', (fabricCanvas as any)._resizeHandler);
             }
         };
-    }, [canvas, getConstructor, saveHistory]);
+    }, [canvas, getConstructor, saveHistory, roomId, isReadOnly]);
 
     // Update tools and current selection properties
     useEffect(() => {
@@ -356,6 +372,22 @@ export const useWhiteboard = ({
 
         // Tool Mode
         c.isDrawingMode = !isReadOnly && (activeTool === 'pen' || activeTool === 'eraser');
+        c.selection = !isReadOnly && activeTool === 'select';
+        c.skipTargetFind = isReadOnly;
+
+        // Apply read-only lock to all existing objects
+        c.getObjects().forEach((obj: any) => {
+            obj.set({
+                selectable: !isReadOnly && activeTool === 'select',
+                evented: !isReadOnly || activeTool === 'zoom',
+                lockMovementX: isReadOnly,
+                lockMovementY: isReadOnly,
+                lockRotation: isReadOnly,
+                lockScalingX: isReadOnly,
+                lockScalingY: isReadOnly
+            });
+        });
+        c.requestRenderAll();
 
         if (activeTool === 'eraser') {
             // Selections cleared above globally for tools

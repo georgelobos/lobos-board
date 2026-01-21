@@ -20,29 +20,31 @@ const App: React.FC = () => {
     const [isUnderline, setIsUnderline] = useState<boolean>(false);
     const [isDashed, setIsDashed] = useState<boolean>(false);
 
-    const [isReadOnly, setIsReadOnly] = useState<boolean>(false);
-    const [roomId, setRoomId] = useState<string>('test-room');
+    const [roomId, setRoomId] = useState<string>(() => {
+        const params = new URLSearchParams(window.location.search);
+        return params.get('room') || 'room-' + Math.random().toString(36).substr(2, 9);
+    });
+    const [isReadOnly, setIsReadOnly] = useState<boolean>(() => {
+        const params = new URLSearchParams(window.location.search);
+        return params.get('view') === 'true';
+    });
+
     const [theme, setTheme] = useState<'light' | 'dark'>(() => {
         const saved = localStorage.getItem('lobos-board-theme');
         return (saved as 'light' | 'dark') || 'light';
     });
 
-    // 1. Initialize Room and Persistence Logic
+    // 1. URL Persistence Logic
     useEffect(() => {
         const params = new URLSearchParams(window.location.search);
-        let room = params.get('room');
-        const viewOnly = params.get('view') === 'true';
+        const room = params.get('room');
 
         if (!room) {
-            // Generate a fresh unique room ID if none exists
-            room = 'room-' + Math.random().toString(36).substr(2, 9);
-            const newUrl = `${window.location.protocol}//${window.location.host}${window.location.pathname}?room=${room}`;
+            const newUrl = `${window.location.protocol}//${window.location.host}${window.location.pathname}?room=${roomId}`;
             window.history.replaceState({ path: newUrl }, '', newUrl);
         }
 
-        setRoomId(room);
-        setIsReadOnly(viewOnly);
-        console.log(`DEBUG: Room initialized: ${room}, ReadOnly: ${viewOnly}`);
+        console.log(`DEBUG: App mounted - Room: ${roomId}, ReadOnly: ${isReadOnly}`);
     }, []);
 
     const shareBoard = () => {
